@@ -30,6 +30,18 @@ dseg	segment para public 'data'
 		Cor				db	7	; Guarda os atributos de cor do caracter
 		POSy			db	3	; a linha pode ir de [1 .. 25]
 		POSx			db	3	; POSx pode ir [1..80]	
+		
+		
+		;#################
+		Nome_Msg		db		'Introduza o seu nome$'	; Para pedir o nome do jogador
+		Turno_MSG		db 		'Turno de $'			; Para indicar de quem é a vez
+		POSya			db	3	; POSy anterior
+		POSxa			db	3	; POSx  anterior
+		PlayerX			db 	'X'
+		PlayerO			db 	'O'
+
+		Board1
+		b
 
 dseg	ends
 
@@ -143,7 +155,8 @@ LE_TECLA	endp
 AVATAR	PROC
 			mov		ax,0B800h
 			mov		es,ax
-CICLO:			
+CICLO:
+		;Pedir input ao jogador
 			goto_xy	POSx,POSy		; Vai para nova possição
 			mov 	ah, 08h
 			mov		bh,0			; numero da página
@@ -193,9 +206,22 @@ ESQUERDA:
 
 DIREITA:
 			cmp		al,4Dh
-			jne		LER_SETA 
+			jne		Place_Mark 
 			inc		POSx		;Direita
 			jmp		CICLO
+			
+Place_Mark:	
+			cmp		al, 0D
+			jne		LER_SETA 
+			
+			;Atualizar jogo com o novo simbolo
+			
+			
+			;logica de encontrar vencedor
+
+
+			jmp		CICLO
+			
 
 fim:				
 			RET
