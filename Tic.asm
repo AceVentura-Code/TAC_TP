@@ -29,19 +29,18 @@ dseg	segment para public 'data'
 		Car				db	32	; Guarda um caracter do Ecran 
 		Cor				db	7	; Guarda os atributos de cor do caracter
 		POSy			db	3	; a linha pode ir de [1 .. 25]
-		POSx			db	3	; POSx pode ir [1..80]	
+		POSx			db	6	; POSx pode ir [1..80]	
 		
 		
 		;#################
 		Nome_Msg		db		'Introduza o seu nome$'	; Para pedir o nome do jogador
 		Turno_MSG		db 		'Turno de $'			; Para indicar de quem é a vez
 		POSya			db	3	; POSy anterior
-		POSxa			db	3	; POSx  anterior
+		POSxa			db	6	; POSx  anterior
 		PlayerX			db 	'X'
 		PlayerO			db 	'O'
-
-		Board1
-		b
+		
+		board			 db  9	 dup( 	9 	dup(0) )	
 
 dseg	ends
 
@@ -53,7 +52,7 @@ assume		cs:cseg, ds:dseg
 ;########################################################################
 goto_xy	macro		POSx,POSy
 		mov		ah,02h
-		mov		bh,0		; numero da página
+		mov		bh,0			; numero da página
 		mov		dl,POSx
 		mov		dh,POSy
 		int		10h
@@ -201,13 +200,15 @@ BAIXO:		cmp		al,50h
 ESQUERDA:
 			cmp		al,4Bh
 			jne		DIREITA
-			dec		POSx		;Esquerda
+			;dec		POSx		;Esquerda
+			Sub		POSx, 2		;Esquerda
 			jmp		CICLO
 
 DIREITA:
 			cmp		al,4Dh
 			jne		Place_Mark 
-			inc		POSx		;Direita
+			;inc		POSx		;Direita
+			Add		POSx, 2		;Direita
 			jmp		CICLO
 			
 Place_Mark:	
@@ -237,6 +238,7 @@ Main  proc
 		mov			es,ax
 		
 		call		apaga_ecran
+		
 		goto_xy		0,0
 		call		IMP_FICH
 		call 		AVATAR
