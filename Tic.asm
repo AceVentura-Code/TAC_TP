@@ -16,31 +16,53 @@
 
 dseg	segment para public 'data'
 
-
+		ExeName			db		'Ultimate Tic Tac Toe$'
 
         Erro_Open       db      'Erro ao tentar abrir o ficheiro$'
         Erro_Ler_Msg    db      'Erro ao tentar ler do ficheiro$'
         Erro_Close      db      'Erro ao tentar fechar o ficheiro$'
-        Fich         	db      'jogo.TXT',0
+        Fich         	db      'jogo1.TXT',0
         HandleFich      dw      0
         car_fich        db      ?
 
 
-		Car				db	32	; Guarda um caracter do Ecran 
-		Cor				db	7	; Guarda os atributos de cor do caracter
-		POSy			db	3	; a linha pode ir de [1 .. 25]
-		POSx			db	6	; POSx pode ir [1..80]	
+		Car				db		32	; Guarda um caracter do Ecran 
+		Cor				db		7	; Guarda os atributos de cor do caracter
+		POSy			db		7	; a linha pode ir de [1 .. 25]
+		POSx			db		15	; POSx pode ir [1..80]	
 		
 		
-		;#################
-		Nome_Msg		db		'Introduza o seu nome$'	; Para pedir o nome do jogador
+		;#################	
+		POSya			db		7	; POSy anterior
+		POSxa			db		15	; POSx  anterior
+		
+		
+		POSyCentral			db		7	; POSy anterior
+		POSxCentral			db		15	; POSx  anterior
+		POSyFinal			db		3	; POSy anterior
+		POSxFinal			db		6	; POSx  anterior
+		
+		
+
+		
+		;board			db  	9	 dup( 	9 	dup(0) )
+
+		
+		currentplayer 	db		0
+		PlayerX			db 		'X'
+		PlayerO			db 		'O'
+		strPlayer	 	db 		'jogador $'		
+
+
+
+
+		Nome_Msg		db		'Introduza o nome (12 chars): $'	; Para pedir o nome do jogador
 		Turno_MSG		db 		'Turno de $'			; Para indicar de quem é a vez
-		POSya			db	3	; POSy anterior
-		POSxa			db	6	; POSx  anterior
-		PlayerX			db 	'X'
-		PlayerO			db 	'O'
-		
-		board			 db  9	 dup( 	9 	dup(0) )	
+		StrPlayer1	 		DB 		"            $"	;  12 digitos
+		StrPlayer2	 		DB 		"            $"			
+
+		MsgPlayerY 		db 		15
+		MsgPlayerX 		db		3	
 
 dseg	ends
 
@@ -149,6 +171,94 @@ LE_TECLA	endp
 
 
 ;########################################################################
+; SET_PLAYERS
+SET_PLAYERS proc
+
+		goto_xy 10, 10
+		lea     dx,ExeName
+		mov     ah,09h
+		int     21h; AH already set to 09h
+
+		;escreve mensagem
+		goto_xy	MsgPlayerX, MsgPlayerY
+		mov     ah,09h
+        lea     dx,Nome_Msg
+        int     21h; AH already set to 09h
+		
+		inc MsgPlayerY
+		goto_xy	MsgPlayerX, 17
+		mov     ah,09h
+		lea		dx,strPlayer
+		int     21h
+		
+		Mov cx, 12 	
+		
+		MOV bx, 0
+
+LER_NOME:	;leitura input nome
+		mov ah,07h
+		int  21h
+		
+		cmp al,13;is an \r\n
+		je Nome_lido;exit on enter
+		
+		; verifica se é uma letra
+		cmp al,'A'
+		jb LER_NOME
+
+		cmp al,'z'
+		ja LER_NOME
+		
+		
+		;mov nomeplayerText[si],al
+		;mov bx,displacement
+		;mov buffer[si+bx],al		; salva o input na matriz buffer
+		;inc si
+		;cmp si, 10
+		;je Nome_lido
+		;jmp lel
+		
+		INC dl
+		
+		loop LER_NOME
+		
+Nome_lido:		
+
+	goto_xy	MsgPlayerX, MsgPlayerY
+	lea     dx, Nome_Msg
+	int     21h; AH already set to 09h
+	ret	
+		
+
+SET_PLAYERS endp
+
+Nome_Leitura proc;leitura input nome
+
+ler_Chan_nome:
+		mov ah,07h
+		int  21h
+		
+		cmp al,13;is an \r\n
+		je fim_nome
+		
+		mov		ah, 02h		; coloca o caracter lido no ecra
+		mov		dl, al
+		int		21H	
+		
+		loop ler_Chan_nome
+		
+		
+		
+fim_nome:
+	ret
+		
+Nome_Leitura endp
+		
+		
+
+
+
+;########################################################################
 ; Avatar
 
 AVATAR	PROC
@@ -156,7 +266,21 @@ AVATAR	PROC
 			mov		es,ax
 CICLO:
 		;Pedir input ao jogador
+			xor bx, bx
+			mov		bl, POSx
+			mov		POSxa, bl
+			mov		bh, POSy
+			mov		POSya, bh
+		
 			goto_xy	POSx,POSy		; Vai para nova possição
+			
+			cmp  Car, 4fh			;
+			jne IMPRIME
+			
+			goto_xy	POSxa,POSya	
+		
+			
+IMPRIME:
 			mov 	ah, 08h
 			mov		bh,0			; numero da página
 			int		10h		
@@ -169,6 +293,9 @@ CICLO:
 			int		21H			
 	
 			goto_xy	POSx,POSy	; Vai para posição do cursor
+		
+		
+
 		
 LER_SETA:	call 	LE_TECLA
 			cmp		ah, 1
@@ -234,13 +361,29 @@ Main  proc
 		mov			ax, dseg
 		mov			ds,ax
 		
+		mov	ah,00h
+		int	1ah
+		
+		Mov ax, dx
+		xor dx, dx
+		mov bx, 2
+		div bx
+		mov currentplayer, dl		
 		mov			ax,0B800h
 		mov			es,ax
 		
 		call		apaga_ecran
+			
+
+		
+		call 		SET_PLAYERS		
+		call		apaga_ecran			
+		
 		
 		goto_xy		0,0
 		call		IMP_FICH
+		
+		goto_xy		POSxCentral,POSyCentral
 		call 		AVATAR
 		goto_xy		0,22
 		
