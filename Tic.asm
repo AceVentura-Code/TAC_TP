@@ -1,13 +1,7 @@
 ;------------------------------------------------------------------------
-;	Base para TRABALHO PRATICO - TECNOLOGIAS e ARQUITECTURAS de COMPUTADORES
+;	TRABALHO PRATICO - TECNOLOGIAS e ARQUITECTURAS de COMPUTADORES
 ;   
 ;	ANO LECTIVO 2022/2023
-;--------------------------------------------------------------
-; Demostração da navegação do cursor do Ecran 
-;
-;		arrow keys to move 
-;		press ESC to exit
-;
 ;--------------------------------------------------------------
 
 .8086
@@ -29,7 +23,7 @@ dseg	segment para public 'data'
 		Car				db		32	; Guarda um caracter do Ecran 
 		Cor				db		7	; Guarda os atributos de cor do caracter
 		POSy			db		7	; a linha pode ir de [1 .. 25]
-		POSx			db		15	; POSx pode ir [1..80]	
+		POSx			db		16	; POSx pode ir [1..80]	
 		
 		
 		;#################	
@@ -37,30 +31,28 @@ dseg	segment para public 'data'
 		POSxa			db		15	; POSx  anterior
 		
 		
-		POSyCentral			db		7	; POSy anterior
-		POSxCentral			db		15	; POSx  anterior
-		POSyFinal			db		3	; POSy anterior
-		POSxFinal			db		6	; POSx  anterior
+		;POSyCentral			db		7	; POSy anterior
+		;POSxCentral			db		15	; POSx  anterior
+		;POSyFinal			db		7	; POSy anterior
+		;POSxFinal			db		57	; POSx  anterior
 		
-		
+		XPosCorners		BYTE		3, 13, 23
+		YPosCorners		BYTE 		2,  6,  10
 
+		LargeBoard			db  	9	 dup( 	9 	dup(0) )
+		FinalBoard			db  	9	 dup(0) 
 		
-		;board			db  	9	 dup( 	9 	dup(0) )
-
-		
-		currentplayer 	db		0
+		currentplayer 	db		2
 		PlayerX			db 		'X'
 		PlayerO			db 		'O'
-		strPlayer	 	db 		'jogador $'		
+		strPlayer	 	db 		'jogador $',0		
 
-
-
-
-		Nome_Msg		db		'Introduza o nome (12 chars): $'	; Para pedir o nome do jogador
-		Turno_MSG		db 		'Turno de $'			; Para indicar de quem é a vez
-		StrPlayer1	 		DB 		"            $"	;  12 digitos
-		StrPlayer2	 		DB 		"            $"			
-
+		Nome_Msg		db		'Introduza o nome (12 chars): $',0	; Para pedir o nome do jogador
+		Turno_MSG		db 		'Turno de $',0			; Para indicar de quem Ã© a vez
+		StrPlayer1	 		DB 		"            $",0	;  12 digitos + $
+		StrPlayer2	 		DB 		"            $",0			
+		strLength		db		12;
+	
 		MsgPlayerY 		db 		15
 		MsgPlayerX 		db		3	
 
@@ -74,7 +66,7 @@ assume		cs:cseg, ds:dseg
 ;########################################################################
 goto_xy	macro		POSx,POSy
 		mov		ah,02h
-		mov		bh,0			; numero da página
+		mov		bh,0			; numero da pï¿½gina
 		mov		dl,POSx
 		mov		dh,POSy
 		int		10h
@@ -169,6 +161,17 @@ SAI_TECLA:	RET
 LE_TECLA	endp
 
 
+;LE_STRING 	proc
+    ;mov ah, 0Ah
+    ;mov dx, offset BufferEntrada
+    ;int 21h
+    ;mov si, offset BufferEntrada + 2 ; A string comeÃ§a no terceiro byte do buffer
+    ;mov di, offset StrInput
+    ;mov cl, byte ptr [BufferEntrada + 1] ; Comprimento da string
+    ;mov ch, 0 ; Zerar o contador
+    ;rep movsb ; Mover a string do buffer de entrada para StrInput
+    ;ret
+;LE_STRING 	endp
 
 ;########################################################################
 ; SET_PLAYERS
@@ -194,6 +197,10 @@ SET_PLAYERS proc
 		Mov cx, 12 	
 		
 		MOV bx, 0
+		
+		
+		;cmp 
+		
 
 LER_NOME:	;leitura input nome
 		mov ah,07h
@@ -202,21 +209,13 @@ LER_NOME:	;leitura input nome
 		cmp al,13;is an \r\n
 		je Nome_lido;exit on enter
 		
-		; verifica se é uma letra
+		; verifica se Ã© uma letra
 		cmp al,'A'
 		jb LER_NOME
 
 		cmp al,'z'
 		ja LER_NOME
 		
-		
-		;mov nomeplayerText[si],al
-		;mov bx,displacement
-		;mov buffer[si+bx],al		; salva o input na matriz buffer
-		;inc si
-		;cmp si, 10
-		;je Nome_lido
-		;jmp lel
 		
 		INC dl
 		
@@ -255,8 +254,17 @@ fim_nome:
 Nome_Leitura endp
 		
 		
-
-
+;########################################################################
+; Player switch
+SwapPlayer macro
+		Mov al, currentplayer
+		Mov ah, dl
+		xor dx, dx
+		mov bx, 2
+		div bx
+		inc dl
+		mov currentplayer, dl	
+endm
 
 ;########################################################################
 ; Avatar
@@ -272,7 +280,7 @@ CICLO:
 			mov		bh, POSy
 			mov		POSya, bh
 		
-			goto_xy	POSx,POSy		; Vai para nova possição
+			goto_xy	POSx,POSy		; Vai para nova possiï¿½ï¿½o
 			
 			cmp  Car, 4fh			;
 			jne IMPRIME
@@ -282,20 +290,17 @@ CICLO:
 			
 IMPRIME:
 			mov 	ah, 08h
-			mov		bh,0			; numero da página
+			mov		bh,0			; numero da pÃ¡gina
 			int		10h		
-			mov		Car, al			; Guarda o Caracter que está na posição do Cursor
-			mov		Cor, ah			; Guarda a cor que está na posição do Cursor
+			mov		Car, al			; Guarda o Caracter que estÃ¡ na posiÃ§Ã£o do Cursor
+			mov		Cor, ah			; Guarda a cor que estÃ¡ na posiÃ§Ã£o do Cursor
 		
-			goto_xy	78,0			; Mostra o caractr que estava na posição do AVATAR
-			mov		ah, 02h			; IMPRIME caracter da posição no canto
+			goto_xy	78,0			; Mostra o caractr que estava na posiÃ§Ã£o do AVATAR
+			mov		ah, 02h			; IMPRIME caracter da posiÃ§Ã£o no canto
 			mov		dl, Car	
 			int		21H			
 	
-			goto_xy	POSx,POSy	; Vai para posição do cursor
-		
-		
-
+			goto_xy	POSx,POSy	; Vai para posiÃ§Ã£o do cursor
 		
 LER_SETA:	call 	LE_TECLA
 			cmp		ah, 1
@@ -304,11 +309,12 @@ LER_SETA:	call 	LE_TECLA
 			JE		FIM
 			goto_xy	POSx,POSy 	; verifica se pode escrever o caracter no ecran
 			mov		CL, Car
-			cmp		CL, 32		; Só escreve se for espaço em branco
+			cmp		CL, 32		; SÃ³ escreve se for espaÃ§o em branco
 			JNE 	LER_SETA
-			mov		ah, 02h		; coloca o caracter lido no ecra
-			mov		dl, al
-			int		21H	
+		
+			;mov		ah, 02h		; coloca o caracter lido no ecra
+			;mov		dl, al
+			;int		21H	
 			goto_xy	POSx,POSy
 			
 			
@@ -317,6 +323,9 @@ LER_SETA:	call 	LE_TECLA
 ESTEND:		cmp 	al,48h
 			jne		BAIXO
 			dec		POSy		;cima
+			;cmp		POSy
+
+
 			jmp		CICLO
 
 BAIXO:		cmp		al,50h
@@ -339,15 +348,33 @@ DIREITA:
 			jmp		CICLO
 			
 Place_Mark:	
-			cmp		al, 0D
-			jne		LER_SETA 
+			cmp		al, 13
+			jne		CICLO 
 			
-			;Atualizar jogo com o novo simbolo
+			;Atualizar tabuleiro com o novo simbolo
 			
+			mov bl, currentplayer
+			cmp bl, 2
+			jb	PlayO
+
+PlayX:
+		mov		ah, 02h		; coloca o caracter X
+		mov		dl, 'X'
+		mov		dh, Car
+		int		21H	
+		jmp PostTurn
+
+PlayO:
+		mov		ah, 02h		; coloca o caracter O
+		mov		dl, 'O'
+		mov		dh, Car
+		int		21H	
+		jmp PostTurn
 			
+PostTurn:
 			;logica de encontrar vencedor
 
-
+			SwapPlayer
 			jmp		CICLO
 			
 
@@ -364,26 +391,28 @@ Main  proc
 		mov	ah,00h
 		int	1ah
 		
-		Mov ax, dx
+		;Random Starting players
+		Mov al, dh
+		Mov ah, dl
 		xor dx, dx
 		mov bx, 2
 		div bx
+		inc dl
 		mov currentplayer, dl		
 		mov			ax,0B800h
 		mov			es,ax
 		
-		call		apaga_ecran
-			
+		call		apaga_ecran	
 
 		
-		call 		SET_PLAYERS		
-		call		apaga_ecran			
+		;call 		SET_PLAYERS		
+		;call		apaga_ecran			
 		
 		
 		goto_xy		0,0
 		call		IMP_FICH
 		
-		goto_xy		POSxCentral,POSyCentral
+		goto_xy		POSx, POSy
 		call 		AVATAR
 		goto_xy		0,22
 		
@@ -392,6 +421,3 @@ Main  proc
 Main	endp
 Cseg	ends
 end	Main
-
-
-		
