@@ -22,51 +22,52 @@ dseg	segment para public 'data'
 
 		Car				db		32	; Guarda um caracter do Ecran 
 		Cor				db		7	; Guarda os atributos de cor do caracter
-		POSy			db		7	; a linha pode ir de [1 .. 25]
-		POSx			db		16	; POSx pode ir [1..80]	
-		
+		POSy			db		8	; a linha pode ir de [1 .. 25]
+		POSx			db		17	; POSx pode ir [1..80]	
 		
 		;#################	
-		POSya			db		7	; POSy anterior
-		POSxa			db		15	; POSx  anterior
+		POSya			db		8	; POSy anterior
+		POSxa			db		17	; POSx  anterior
 		
-		
-		;POSyCentral			db		7	; POSy anterior
-		;POSxCentral			db		15	; POSx  anterior
-		;POSyFinal			db		7	; POSy anterior
-		;POSxFinal			db		57	; POSx  anterior
-		
-		XPosCorners		BYTE		3, 13, 23
-		YPosCorners		BYTE 		2,  6,  10
+		XPosCorners		BYTE	3, 13, 23
+		YPosCorners		BYTE	2,  7, 12
 
-		LargeBoard			db  	9	 dup( 	9 	dup(0) )
-		FinalBoard			db  	9	 dup(0) 
+		LargeBoard		db  	9	 dup( 9 dup(0) )
+		FinalBoard		db  	9	 dup(0) 
 		
 		currentplayer 	db		2
 		PlayerX			db 		'X'
 		PlayerO			db 		'O'
 		strPlayer	 	db 		'jogador $',0		
 
-		Nome_Msg		db		'Introduza o nome (12 chars): $',0	; Para pedir o nome do jogador
-		Turno_MSG		db 		'Turno de $',0			; Para indicar de quem é a vez
-		StrPlayer1	 		DB 		"            $",0	;  12 digitos + $
-		StrPlayer2	 		DB 		"            $",0			
-		strLength		db		12;
+		Nome_Ms			db		'Introduza o nome (12 chars): $',0	; Para pedir o nome do jogador
+		Turno_MSG		db 		'É Turno de :$',0			; Para indicar de quem é a vez
+		StrPlayer1	 	DB 		"            $",0	;  12 digitos + $
+		StrPlayer2	 	DB 		"            $",0			
+		strLength		db		12
 	
 		MsgPlayerY 		db 		15
 		MsgPlayerX 		db		3	
 
+		;offset to game  in the corner
+		boardOffsetX	db		1
+		boardoffsetY	db		1
+		;offset to in board corner
+		moveOffsetX	db		1
+		moveoffsetY	db		1
+		indexInFullboard db		0
+
 dseg	ends
 
 cseg	segment para public 'code'
-assume		cs:cseg, ds:dseg
+assume	cs:cseg, ds:dseg
 
 
 
 ;########################################################################
 goto_xy	macro		POSx,POSy
 		mov		ah,02h
-		mov		bh,0			; numero da p�gina
+		mov		bh,0			; numero da página
 		mov		dl,POSx
 		mov		dh,POSy
 		int		10h
@@ -81,8 +82,8 @@ apaga_ecran	proc
 			xor		bx,bx
 			mov		cx,25*80
 		
-apaga:		mov		byte ptr es:[bx],' '
-			mov		byte ptr es:[bx+1],7
+apaga:		mov		byte ptr es:[bx], ' '
+			mov		byte ptr es:[bx+1], 7
 			inc		bx
 			inc 	bx
 			loop	apaga
@@ -140,8 +141,8 @@ fecha_ficheiro:
         Int     21h
 sai_f:	
 		RET
-		
-IMP_FICH	endp		
+
+IMP_FICH	endp
 
 
 ;########################################################################
@@ -173,85 +174,85 @@ LE_TECLA	endp
     ;ret
 ;LE_STRING 	endp
 
-;########################################################################
-; SET_PLAYERS
-SET_PLAYERS proc
+; ; ;########################################################################
+; ; ; SET_PLAYERS
+; ; SET_PLAYERS proc
 
-		goto_xy 10, 10
-		lea     dx,ExeName
-		mov     ah,09h
-		int     21h; AH already set to 09h
+; ; 		goto_xy 10, 10
+; ; 		lea     dx,ExeName
+; ; 		mov     ah,09h
+; ; 		int     21h; AH already set to 09h
 
-		;escreve mensagem
-		goto_xy	MsgPlayerX, MsgPlayerY
-		mov     ah,09h
-        lea     dx,Nome_Msg
-        int     21h; AH already set to 09h
+; ; 		;escreve mensagem
+; ; 		goto_xy	MsgPlayerX, MsgPlayerY
+; ; 		mov     ah,09h
+; ;         lea     dx,Nome_Msg
+; ;         int     21h; AH already set to 09h
 		
-		inc MsgPlayerY
-		goto_xy	MsgPlayerX, 17
-		mov     ah,09h
-		lea		dx,strPlayer
-		int     21h
+; ; 		inc MsgPlayerY
+; ; 		goto_xy	MsgPlayerX, 17
+; ; 		mov     ah,09h
+; ; 		lea		dx,strPlayer
+; ; 		int     21h
 		
-		Mov cx, 12 	
+; ; 		Mov cx, 12 	
 		
-		MOV bx, 0
-		
-		
-		;cmp 
-		
-
-LER_NOME:	;leitura input nome
-		mov ah,07h
-		int  21h
-		
-		cmp al,13;is an \r\n
-		je Nome_lido;exit on enter
-		
-		; verifica se é uma letra
-		cmp al,'A'
-		jb LER_NOME
-
-		cmp al,'z'
-		ja LER_NOME
+; ; 		MOV bx, 0
 		
 		
-		INC dl
-		
-		loop LER_NOME
-		
-Nome_lido:		
-
-	goto_xy	MsgPlayerX, MsgPlayerY
-	lea     dx, Nome_Msg
-	int     21h; AH already set to 09h
-	ret	
+; ; 		;cmp 
 		
 
-SET_PLAYERS endp
+; ; LER_NOME:	;leitura input nome
+; ; 		mov ah,07h
+; ; 		int  21h
+		
+; ; 		cmp al,13;is an \r\n
+; ; 		je Nome_lido;exit on enter
+		
+; ; 		; verifica se é uma letra
+; ; 		cmp al,'A'
+; ; 		jb LER_NOME
 
-Nome_Leitura proc;leitura input nome
+; ; 		cmp al,'z'
+; ; 		ja LER_NOME
+		
+		
+; ; 		INC dl
+		
+; ; 		loop LER_NOME
+		
+; ; Nome_lido:		
 
-ler_Chan_nome:
-		mov ah,07h
-		int  21h
+; ; 	goto_xy	MsgPlayerX, MsgPlayerY
+; ; 	lea     dx, Nome_Msg
+; ; 	int     21h; AH already set to 09h
+; ; 	ret	
 		
-		cmp al,13;is an \r\n
-		je fim_nome
+
+; ; SET_PLAYERS endp
+
+; ; Nome_Leitura proc;leitura input nome
+
+; ; ler_Chan_nome:
+; ; 		mov ah,07h
+; ; 		int  21h
 		
-		mov		ah, 02h		; coloca o caracter lido no ecra
-		mov		dl, al
-		int		21H	
+; ; 		cmp al,13;is an \r\n
+; ; 		je fim_nome
 		
-		loop ler_Chan_nome
+; ; 		mov		ah, 02h		; coloca o caracter lido no ecra
+; ; 		mov		dl, al
+; ; 		int		21H	
+		
+; ; 		loop ler_Chan_nome
 		
 		
 		
-fim_nome:
-	ret
+; ; fim_nome:
+; ; 	ret
 		
-Nome_Leitura endp
+; ; Nome_Leitura endp
 		
 		
 ;########################################################################
@@ -265,6 +266,144 @@ SwapPlayer macro
 		inc dl
 		mov currentplayer, dl	
 endm
+
+;########################################################################
+; Calculate offset to left-up-most board
+;		0 for aligned, 1 for middle, 2 for oposite
+;		for both x (left) and y (up)
+
+CalcBoardOffset PROC
+		Mov bl, byte ptr [XPosCorners + 2]
+		mov al, POSx;fica com o valor durante toda a proc
+
+	LastColumn:
+		cmp al, bl
+		jb MiddleColumn;se for menos, não está na coluna da direita
+		mov boardOffsetX, 2
+		jmp YOffset
+
+	MiddleColumn:
+		Mov bl, byte ptr [XPosCorners + 1]
+		cmp al, bl
+		jb FirstCol;se for menos, não está na coluna do meio
+		mov boardOffsetX, 1
+		jmp YOffset
+		
+	FirstCol:;Se chega aqui, só pode estar nesta
+		mov boardOffsetX, 0
+
+	YOffset:
+		Mov bl, byte ptr [XPosCorners + 2]
+	LastRow:
+		cmp al, bl
+		jb MiddleRow;se for menos, não está na linha do fundo
+		mov boardOffsetY, 2
+		jmp EndCalc
+
+	MiddleRow:
+		Mov bl, byte ptr [YPosCorners + 1]
+		cmp al, bl
+		jb FirstRow;se for menos, não está na linha do meio
+		mov boardOffsetY, 1
+		jmp EndCalc
+
+	FirstRow:;Se chega aqui, só pode estar nesta
+		mov boardOffsetY, 0
+
+EndCalc:
+	ret
+CalcBoardOffset endp
+
+
+; Calculate offset inside board
+; 		0 for aligned, 1 for middle, 2 for oposite
+; 		for both x (left) and y (up)
+
+CalcMoveOffset PROC
+		mov bl, byte ptr [XPosCorners]
+		mov al, boardOffsetX
+		mul 10; diferença entre mesmas posições de tabuleiros ajacentes de cada linha 
+		add bl, al
+		xor ax, ax
+		mov al, POSx
+		inc bl
+
+	IsMiddleColumn:
+		cmp al, bl
+		jb IsFirstColumn
+		ja IsLastColumn
+		mov boardOffsetX, 1
+		jmp YMove
+
+	IsLastColumn:
+		mov boardOffsetX, 2
+		jmp YMove
+		
+	IsFirstColumn:
+		mov boardOffsetX, 0
+
+YMove:
+		mov bl, byte ptr [YPosCorners]
+		mov al, boardOffsetY
+		mul 5; diferença entre mesmas posições de tabuleiros ajacentes de cada coluna
+		add bl, al
+		xor ax, ax
+		mov al, POSx
+		inc bl
+
+	IsMiddleRow:
+		cmp al, bl
+		jb IsFirstRow
+		ja IsLastRow
+		mov boardOffsetX, 1
+		jmp EndCalcMove
+
+	IsLastRow:
+		mov boardOffsetX, 2
+		jmp EndCalcMove
+		
+	IsFirstRow:
+		mov boardOffsetX, 0
+
+
+EndCalcMove:
+	ret
+
+CalcMoveOffset endp
+
+
+UpdataBoardWithMove proc
+
+		; Mov bx, offset XPosCorners
+		; Xor ax, ax;reset AX
+		; mov al, boardOffsetX; poe desloc em ax (al para NÃO ir buscar mais bytes) 
+		; mov si, ax; move para SI com tamnaho certo
+		; add bx, si; soma o valor em si  
+		; inc bl
+		; mov al, POSx
+
+	;;;Mov [LargeBoard + ?] , currentplayer
+
+		XOR ax, ax
+		mov al, boardOffsetX
+		mov bl, moveOffsetX
+
+		
+
+
+		Mov indexInFullboard, al
+
+		Mov bx, offset LargeBoard
+		Xor ax, ax;reset AX
+		mov al, boardOffsetX; poe desloc em ax (al para NÃO ir buscar mais bytes) 
+		mov si, ax; move para SI com tamnaho certo
+		add bx, si; soma o valor em si  
+		inc bl
+		mov al, POSx
+
+
+UpdataBoardWithMove endp
+
 
 ;########################################################################
 ; Avatar
@@ -282,10 +421,10 @@ CICLO:
 		
 			goto_xy	POSx,POSy		; Vai para nova possi��o
 			
-			cmp  Car, 4fh			;
-			jne IMPRIME
+			;cmp  Car, 4fh		
+			;jne IMPRIME
 			
-			goto_xy	POSxa,POSya	
+			;goto_xy	POSxa,POSya	
 		
 			
 IMPRIME:
@@ -307,52 +446,68 @@ LER_SETA:	call 	LE_TECLA
 			je		ESTEND
 			CMP 	AL, 27		; ESCAPE
 			JE		FIM
+
+
 			goto_xy	POSx,POSy 	; verifica se pode escrever o caracter no ecran
 			mov		CL, Car
 			cmp		CL, 32		; Só escreve se for espaço em branco
+			
 			JNE 	LER_SETA
 		
 			;mov		ah, 02h		; coloca o caracter lido no ecra
 			;mov		dl, al
 			;int		21H	
 			goto_xy	POSx,POSy
-			
-			
+	
+			;Is enter
+			cmp		al, 0dh
+			je		Place_Mark 
+
 			jmp		LER_SETA
 		
 ESTEND:		cmp 	al,48h
 			jne		BAIXO
 			dec		POSy		;cima
-			;cmp		POSy
 
+			cmp		POSy, 1;Limite superior de tabuleiro
+			ja		CICLO
+			inc		POSy
 
 			jmp		CICLO
 
 BAIXO:		cmp		al,50h
 			jne		ESQUERDA
-			inc 	POSy		;Baixo
+			inc 	POSy		;Baixo			
+			cmp		POSy, 15 ;Limite inferiror de tabuleiro
+			jb		CICLO
+			dec		POSy
+
 			jmp		CICLO
 
 ESQUERDA:
 			cmp		al,4Bh
 			jne		DIREITA
-			;dec		POSx		;Esquerda
 			Sub		POSx, 2		;Esquerda
+					
+			cmp		POSx, 3;Limite esquerdo de tabuleiro
+			ja		CICLO
+			Add 	POSx, 2
+
 			jmp		CICLO
 
 DIREITA:
 			cmp		al,4Dh
-			jne		Place_Mark 
-			;inc		POSx		;Direita
+			jne		LER_SETA 
 			Add		POSx, 2		;Direita
+			
+			cmp		POSx, 31	;Limite direito de tabuleiro
+			jb		CICLO
+			Sub 	POSx, 2
+
 			jmp		CICLO
-			
-Place_Mark:	
-			cmp		al, 13
-			jne		CICLO 
-			
-			;Atualizar tabuleiro com o novo simbolo
-			
+
+
+Place_Mark:	;Atualizar tabuleiro com o novo simbolo
 			mov bl, currentplayer
 			cmp bl, 2
 			jb	PlayO
@@ -372,13 +527,17 @@ PlayO:
 		jmp PostTurn
 			
 PostTurn:
+			call CalcBoardOffset
+			; call CalcMoveOffset
+
 			;logica de encontrar vencedor
 
+
+			;set up next turn
 			SwapPlayer
 			jmp		CICLO
-			
 
-fim:				
+fim:
 			RET
 AVATAR		endp
 
