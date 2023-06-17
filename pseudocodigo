@@ -1,0 +1,74 @@
+;Input - offset board  X & Y; offset move X & Y; array 9 * 9; jogador
+
+;1ª Find board in array
+
+;boardOffsetX => 9 posições no array 
+;boardOffsetY => 27 posições no array
+
+UpdateBoardWithMove PROC
+
+	SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
+	; Bl aponta para posição de canto do tabuleiro
+    
+    mov al, moveOffsetY
+    mov ah,3; diferença entre linhas dentro do tabuleiro
+	mul ah
+    ;xor Ah,ah; provavelmente redundante (ax = al*ah põe ah a 0)
+	add bx, ax
+    mov ax, moveOffsetX
+	add bx, ax
+	; Bl aponta para posição de jogada no tabuleiro
+    
+    mov [bx], jogador;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	xor ax, ax
+
+    ret
+UpdateBoardWithMove endp
+
+SetBxToCorner macro
+	mov bl, byte ptr [array];!!!!!!!!!!!!!!!!!
+    
+	mov al, boardOffsetY
+	mul 27; diferença entre localização no arrya de tabuleiros em coluna 
+	add bl, al
+
+    mov al, boardOffsetX
+	mul 9; diferença entre localização no arrya de tabuleiros em linha
+	add bl, al
+	; Bl aponta para posição de canto do tabuleiro
+endm
+
+CheckNotDiagonal PROC		; declare var compare e move
+
+    mov cx, 3; há 3 linha e tres colunas
+    mov AH, [bx];Com o qual comparar
+    mov AL, [bx+compare]
+    cmp AH, AL
+    jne
+
+endm
+
+
+
+SearchForWin PROC
+	;mover para bl o ponteiro do inicio do array
+	mov bl, byte ptr [array];!!!!!!!!!!!!!!!!!
+    
+	mov al, boardOffsetY
+	mul 27; diferença entre localização no arrya de tabuleiros em coluna 
+	add bl, al
+
+    mov al, boardOffsetX
+	mul 9; diferença entre localização no arrya de tabuleiros em linha
+	add bl, al
+	; Bl aponta para posição de canto do tabuleiro
+    
+	xor ax, ax
+
+
+    ret
+UpdateBoardWithMove endp
+
+
+
+;2ª check board for victory

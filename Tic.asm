@@ -320,9 +320,12 @@ CalcBoardOffset endp
 ; 		for both x (left) and y (up)
 
 CalcMoveOffset PROC
+		xor ax, ax
+		xor bx, bx
 		mov bl, byte ptr [XPosCorners]
 		mov al, boardOffsetX
-		mul 10; diferença entre mesmas posições de tabuleiros ajacentes de cada linha 
+		mov ah, 10
+		mul ah; diferença entre mesmas posições de tabuleiros ajacentes de cada linha 
 		add bl, al
 		xor ax, ax
 		mov al, POSx
@@ -343,9 +346,12 @@ CalcMoveOffset PROC
 		mov boardOffsetX, 0
 
 YMove:
+		xor ax, ax
+		xor bx, bx
 		mov bl, byte ptr [YPosCorners]
 		mov al, boardOffsetY
-		mul 5; diferença entre mesmas posições de tabuleiros ajacentes de cada coluna
+		mov ah, 10
+		mul ah; diferença entre mesmas posições de tabuleiros ajacentes de cada coluna
 		add bl, al
 		xor ax, ax
 		mov al, POSx
@@ -404,6 +410,25 @@ UpdataBoardWithMove proc
 
 UpdataBoardWithMove endp
 
+
+SetBxToCorner macro LargeBoard, boardOffsetX, boardOffsetY
+	xor ax, ax
+	xor bx, bx
+	lea si, LargeBoard
+	mov bx, si
+	mov al, boardOffsetY
+	mov ah, 27; diferença entre localização no arrya de tabuleiros em coluna 
+	mul ah
+	xor ah, ah
+	add bx, ax
+
+    mov al, boardOffsetX
+	mov ah, 9; diferença entre localização no arrya de tabuleiros em linha
+	mul ah
+	xor ah, ah
+	add bx, ax
+	; Bl aponta para posição de canto do tabuleiro
+endm
 
 ;########################################################################
 ; Avatar
@@ -563,7 +588,11 @@ Main  proc
 		
 		call		apaga_ecran	
 
-		
+		mov boardOffsetX, 1
+		mov boardOffsetY, 2
+		SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
+
+
 		;call 		SET_PLAYERS		
 		;call		apaga_ecran			
 		
