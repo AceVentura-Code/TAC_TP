@@ -1,9 +1,63 @@
+;;TUFJTHwxNjg3MDE1MTU2Mzg0fDEwMDB8MzQgNnx0ZXN0fA==
+
+
+
+; Apresentação dos tabuleiros no ecrã                                          » :D
+
+; Leitura e apresentação do nome do jogador em cada jogada                     » 
+
+; Navegação limitada nas células dos tabuleiros que permitem
+; assinalar a jogada de cada jogador (X ou O). Bloquear o
+; mini-tabuleiro quando não fizer sentido mais jogadas no mesmo                » :)
+
+; Identificação correta quando um dos jogadores ganha um
+; mini-tabuleiro ou existe um empate no mini-tabuleiro.                        » 
+
+; Mostrar corretamente no tabuleiro principal o resultado de cada
+; vitória dos mini-tabuleiros bem como alteração da cor de fundo no
+; correspondente mini-tabuleiro.                                                » 
+
+; Identificação do vencedor do jogo ou de empate final                          » 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ;Input - offset board  X & Y; offset move X & Y; array 9 * 9; jogador
 
 ;1ª Find board in array
 
 ;boardOffsetX => 9 posições no array 
 ;boardOffsetY => 27 posições no array
+SetBxToCorner macro LargeBoard, boardOffsetX, boardOffsetY
+	xor ax, ax
+	xor bx, bx
+	lea si, LargeBoard
+	mov bx, si
+	mov al, boardOffsetY
+	mov ah, 27; diferença entre localização no arrya de tabuleiros em coluna 
+	mul ah
+	xor ah, ah
+	add bx, ax
+
+    mov al, boardOffsetX
+	mov ah, 9; diferença entre localização no arrya de tabuleiros em linha
+	mul ah
+	xor ah, ah
+	add bx, ax
+	; Bl aponta para posição de canto do tabuleiro
+endm
+
 
 UpdateBoardWithMove PROC
 
@@ -15,42 +69,21 @@ UpdateBoardWithMove PROC
 	mul ah
     ;xor Ah,ah; provavelmente redundante (ax = al*ah põe ah a 0)
 	add bx, ax
-    mov ax, moveOffsetX
+    mov al, moveOffsetX
 	add bx, ax
 	; Bl aponta para posição de jogada no tabuleiro
     
-    mov [bx], jogador;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	xor ax, ax
+    mov al, byte ptr [currentplayer]
+    mov [bx], al
 
     ret
 UpdateBoardWithMove endp
 
-SetBxToCorner macro
-	mov bl, byte ptr [array];!!!!!!!!!!!!!!!!!
-    
-	mov al, boardOffsetY
-	mul 27; diferença entre localização no arrya de tabuleiros em coluna 
-	add bl, al
-
-    mov al, boardOffsetX
-	mul 9; diferença entre localização no arrya de tabuleiros em linha
-	add bl, al
-	; Bl aponta para posição de canto do tabuleiro
-endm
-
-CheckNotDiagonal PROC		; declare var compare e move
-
-    mov cx, 3; há 3 linha e tres colunas
-    mov AH, [bx];Com o qual comparar
-    mov AL, [bx+compare]
-    cmp AH, AL
-    jne
-
-endm
 
 
 
-SearchForWin PROC
+SearchForWinner PROC
 	;mover para bl o ponteiro do inicio do array
 	mov bl, byte ptr [array];!!!!!!!!!!!!!!!!!
     
@@ -62,13 +95,28 @@ SearchForWin PROC
 	mul 9; diferença entre localização no arrya de tabuleiros em linha
 	add bl, al
 	; Bl aponta para posição de canto do tabuleiro
-    
+
 	xor ax, ax
 
 
-    ret
-UpdateBoardWithMove endp
 
+
+    ret
+SearchForWinner endp
+
+
+CheckNotDiagonal proc
+    ;bx at up-left corner
+    mov cx, 3
+    cicloLinhas:
+    mov ah, [bx]
+    mov al, [bx+1]
+    cmp ah, al
+    jne cicloLinhas
+
+
+
+CheckNotDiagonal endp
 
 
 ;2ª check board for victory

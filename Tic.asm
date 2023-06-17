@@ -30,16 +30,22 @@ dseg	segment para public 'data'
 		POSxa			db		17	; POSx  anterior
 		
 		XPosCorners		BYTE	3, 13, 23
-		YPosCorners		BYTE	2,  7, 12
+		YPosCorners		BYTE	1,  6, 11
 
 		LargeBoard		db  	9	 dup( 9 dup(0) )
+		PlayerX			db 		'X'
 		FinalBoard		db  	9	 dup(0) 
 		
-		currentplayer 	db		2
-		PlayerX			db 		'X'
 		PlayerO			db 		'O'
-		strPlayer	 	db 		'jogador $',0		
+		currentplayer 	db		2
+		
+		boardOffsetX	db		1
+		boardoffsetY	db		1
+		;offset to in board corner
+		moveOffsetX	db		1
+		moveoffsetY	db		1
 
+		strPlayer	 	db 		'jogador $',0
 		Nome_Ms			db		'Introduza o nome (12 chars): $',0	; Para pedir o nome do jogador
 		Turno_MSG		db 		'É Turno de :$',0			; Para indicar de quem é a vez
 		StrPlayer1	 	DB 		"            $",0	;  12 digitos + $
@@ -50,11 +56,7 @@ dseg	segment para public 'data'
 		MsgPlayerX 		db		3	
 
 		;offset to game  in the corner
-		boardOffsetX	db		1
-		boardoffsetY	db		1
-		;offset to in board corner
-		moveOffsetX	db		1
-		moveoffsetY	db		1
+
 		indexInFullboard db		0
 
 dseg	ends
@@ -293,7 +295,8 @@ CalcBoardOffset PROC
 		mov boardOffsetX, 0
 
 	YOffset:
-		Mov bl, byte ptr [XPosCorners + 2]
+		Mov bl, byte ptr [YPosCorners + 2]
+		mov al, POSy;
 	LastRow:
 		cmp al, bl
 		jb MiddleRow;se for menos, não está na linha do fundo
@@ -322,93 +325,61 @@ CalcBoardOffset endp
 CalcMoveOffset PROC
 		xor ax, ax
 		xor bx, bx
-		mov bl, byte ptr [XPosCorners]
+		mov bl, byte ptr [XPosCorners];parede esquerda do tabuleiro
+		add bl,2; fica a apontar para 1ª posição
 		mov al, boardOffsetX
 		mov ah, 10
 		mul ah; diferença entre mesmas posições de tabuleiros ajacentes de cada linha 
 		add bl, al
 		xor ax, ax
 		mov al, POSx
-		inc bl
+		add bl,2 ; posições validas tem 1 espaço vazio no meio
 
 	IsMiddleColumn:
 		cmp al, bl
 		jb IsFirstColumn
 		ja IsLastColumn
-		mov boardOffsetX, 1
+		mov moveoffsetX, 1
 		jmp YMove
 
 	IsLastColumn:
-		mov boardOffsetX, 2
+		mov moveoffsetX, 2
 		jmp YMove
 		
 	IsFirstColumn:
-		mov boardOffsetX, 0
+		mov moveoffsetX, 0
 
-YMove:
-		xor ax, ax
+	YMove:
 		xor bx, bx
-		mov bl, byte ptr [YPosCorners]
+		xor ax, ax
+		mov bl, byte ptr [YPosCorners];parede de cima do tabuleiro
+		inc bl ; fica a apontar para 1ª posição
 		mov al, boardOffsetY
-		mov ah, 10
+		mov ah, 5
 		mul ah; diferença entre mesmas posições de tabuleiros ajacentes de cada coluna
 		add bl, al
 		xor ax, ax
-		mov al, POSx
+		mov al, POSy
 		inc bl
 
 	IsMiddleRow:
 		cmp al, bl
 		jb IsFirstRow
 		ja IsLastRow
-		mov boardOffsetX, 1
+		mov moveoffsetY, 1
 		jmp EndCalcMove
 
 	IsLastRow:
-		mov boardOffsetX, 2
+		mov moveoffsetY, 2
 		jmp EndCalcMove
 		
 	IsFirstRow:
-		mov boardOffsetX, 0
-
+		mov moveoffsetY, 0
 
 EndCalcMove:
 	ret
 
 CalcMoveOffset endp
-
-
-UpdataBoardWithMove proc
-
-		; Mov bx, offset XPosCorners
-		; Xor ax, ax;reset AX
-		; mov al, boardOffsetX; poe desloc em ax (al para NÃO ir buscar mais bytes) 
-		; mov si, ax; move para SI com tamnaho certo
-		; add bx, si; soma o valor em si  
-		; inc bl
-		; mov al, POSx
-
-	;;;Mov [LargeBoard + ?] , currentplayer
-
-		XOR ax, ax
-		mov al, boardOffsetX
-		mov bl, moveOffsetX
-
-		
-
-
-		Mov indexInFullboard, al
-
-		Mov bx, offset LargeBoard
-		Xor ax, ax;reset AX
-		mov al, boardOffsetX; poe desloc em ax (al para NÃO ir buscar mais bytes) 
-		mov si, ax; move para SI com tamnaho certo
-		add bx, si; soma o valor em si  
-		inc bl
-		mov al, POSx
-
-
-UpdataBoardWithMove endp
 
 
 SetBxToCorner macro LargeBoard, boardOffsetX, boardOffsetY
@@ -429,6 +400,29 @@ SetBxToCorner macro LargeBoard, boardOffsetX, boardOffsetY
 	add bx, ax
 	; Bl aponta para posição de canto do tabuleiro
 endm
+
+
+UpdateBoardWithMove PROC
+
+	SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
+	; Bl aponta para posição de canto do tabuleiro
+    
+    mov al, moveOffsetY
+    mov ah,3; diferença entre linhas dentro do tabuleiro
+	mul ah
+    ;xor Ah,ah; provavelmente redundante (ax = al*ah põe ah a 0)
+	add bx, ax
+    mov al, moveOffsetX
+	add bx, ax
+	; Bl aponta para posição de jogada no tabuleiro
+    
+	xor ax, ax
+    mov al, byte ptr [currentplayer]
+    mov [bx], al
+
+    ret
+UpdateBoardWithMove endp
+
 
 ;########################################################################
 ; Avatar
@@ -542,6 +536,7 @@ PlayX:
 		mov		dl, 'X'
 		mov		dh, Car
 		int		21H	
+		call UpdateBoardWithMove
 		jmp PostTurn
 
 PlayO:
@@ -549,11 +544,12 @@ PlayO:
 		mov		dl, 'O'
 		mov		dh, Car
 		int		21H	
+		call UpdateBoardWithMove
 		jmp PostTurn
 			
 PostTurn:
 			call CalcBoardOffset
-			; call CalcMoveOffset
+			call CalcMoveOffset
 
 			;logica de encontrar vencedor
 
@@ -588,9 +584,20 @@ Main  proc
 		
 		call		apaga_ecran	
 
-		mov boardOffsetX, 1
-		mov boardOffsetY, 2
-		SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;Temporary
+
+		mov		POSx,9
+		mov		POSy,4
+		goto_xy		POSx, POSy
+
+;;;;;;;;;Zona de testes
+
+	;;;;;;;;;;;;
+
+
+	; call UpdateBoardWithMove
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;Temporary
 
 
 		;call 		SET_PLAYERS		
