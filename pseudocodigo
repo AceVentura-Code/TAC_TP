@@ -24,15 +24,6 @@
 
 
 
-
-
-
-
-
-
-
-
-
 ;Input - offset board  X & Y; offset move X & Y; array 9 * 9; jogador
 
 ;1ª Find board in array
@@ -85,8 +76,8 @@ UpdateBoardWithMove endp
 
 SearchForWinner PROC
 	;mover para bl o ponteiro do inicio do array
-	mov bl, byte ptr [array];!!!!!!!!!!!!!!!!!
-    
+	lea si, LargeBoard
+	mov bx, si
 	mov al, boardOffsetY
 	mul 27; diferença entre localização no arrya de tabuleiros em coluna 
 	add bl, al
@@ -105,18 +96,179 @@ SearchForWinner PROC
 SearchForWinner endp
 
 
-CheckNotDiagonal proc
+CheckForVictory proc
+	SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
     ;bx at up-left corner
     mov cx, 3
-    cicloLinhas:
+    cicloLinhas:; compara os simbolos das linhas
+		mov ah, [bx]
+		mov al, [bx+1]
+		cmp ah, al
+		jne PrepareNextloop
+		mov al, [bx+2]
+		jne PrepareNextloop
+		call UpdateFinalBoard;vitoria
+		jmp ExitSearch
+		PrepareNextlineLoop:
+			mov al, 3
+			add bl, al;
+	loop cicloLinhas
+
+
+	SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
+    mov cx, 3
+    cicloColunas:; compara os simbolos da coluna
     mov ah, [bx]
-    mov al, [bx+1]
+    mov al, [bx+3]
     cmp ah, al
-    jne cicloLinhas
+    jne PrepareNextloop
+	mov al, [bx+6]
+    jne PrepareNextloop
+    call UpdateFinalBoard;vitoria
+    jmp ExitSearch
 
+PrepareNextColumnLoop:
+        mov al, 1
+        add bl, al;
+	loop cicloColunas
 
+Diagonals:
+	SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
+	mov ax, 4
+	add bx, ax;Centro do tabuleiro
+
+	Downward: ;Canto superior esquerdo para inferior direito
+	mov al, [bx+4]
+	cmp al, bl
+	jne Upwards
+	mov al, [bx-4]
+	cmp al, bl
+	jne Upwards
+	jmp	UpdateFinalBoard
+	
+	Upwards:;Canto inferior esquerdo para superior direito
+	mov al, [bx+2]
+	cmp al, bl
+	jne ExitSearch
+	mov al, [bx-2]
+	cmp al, bl
+	jne IsDraw
+	call	UpdateFinalBoard
+    jmp ExitSearch
+
+IsDraw:
+	SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
+	xor ah, ah
+	mov cx, 9
+	hasContent:
+		mov al, [bx]
+		cmp ah, al
+		je ExitSearch
+	loop hasContent
+	;
+	mov _player, 0
+	call PaintBoardColour 
+
+ExitSearch:
+	ret
 
 CheckNotDiagonal endp
 
 
-;2ª check board for victory
+
+UpdateFinalBoard proc; acabou-se o jogo
+	mov _player, [bx]; guarda qual é o jogador que ganho o tabuleiro
+	xor ax, ax
+	xor bx, bx
+	lea si, FinalBoard
+	mov bx, si
+	mov al, boardOffsetY
+	mov ah, 3; diferença entre localização no arrays de tabuleiros em coluna 
+	mul ah
+	xor ah, ah
+	add bx, ax
+	mov al, boardOffsetX
+	add bx, ax
+    mov [bx], _player; recebe o jogador vitorioso para o tabuleiro fianl
+    mov al, POSxR; localização do canto do tabuleiro final
+    mov ah, POSyR
+    add al, boardOffsetX; descolar de acordo com o tabuleiro jogado
+    add ah, boardOffsetY
+	mov POSxV, al; localização para alterar
+    mov POSyV, ah,
+    goto_xy POSxV, POSyV
+    mov bl, _player;get player
+		cmp bl, 2
+		jb	WriteO
+    WriteX:
+        mov		dl, 'X'
+        jmp WriteOnFinal
+    WriteO:
+            mov		dl, 'O'
+    WriteOnFinal:
+        mov		dh, Car
+        int		21H	; imprime carater
+	;WIP- mudança de cores
+	call PaintBoardColour 
+
+UpdateFinalBoard endp
+
+
+
+PaintBoardColour proc
+	; 01h azul - vitoria jogador 1
+	; 02h verde - vitoria jogador 2
+	; 0Eh amarelo - empate
+	
+    lea si, YPosCorners; localização de referencia dos canto do tabuleiro grande
+	add si, boardOffsetY
+	inc si
+	mov al,[si]
+	mov POSyV,al
+    
+	lea si, XPosCorners; localização de referencia dos canto do tabuleiro grande
+	add si, boardOffsetX
+	inc si
+	mov al,[si]
+	mov POSxV, al
+	
+	;;poe o cursor onde é para começar a pintar
+	;goto_xy POSxV, POSyV
+
+	mov ax,0b800h
+	mov es,ax
+
+	; posição = Linha*160 + Coluna*2
+	xor ax, ax
+	mov al, POSyV
+	mov bl, 160
+	mul bl 	; Ax = 160 * linha
+	mov bx, ax
+	xor ax, ax
+	mov al, POSxV
+	mov ax, 2
+	mul ah
+	add bx, ax
+	
+	
+	xor ah,ah
+	mov al _player 
+	cmp ah, al
+	jmp NotDraw
+	mov al 0Eh;amarelo
+	jmp Print
+NotDraw:
+	mov al, _player
+
+Print:
+	mov cx, 7
+	ciclo: 
+		;mov es:[bx],ah		;altera letra
+		mov es:[bx+1], al	;altera cores da letra
+		mov es:[bx+1+ 160], al	;altera cores da letra
+		mov es:[bx+1+ 160 + 160], al	;altera cores da letra
+		inc bx				;Incrementa o bx duas vezes
+		inc bx				;Porque cada letra são dois bytes
+	loop ciclo
+
+PaintBoardColour endp

@@ -26,19 +26,21 @@ dseg	segment para public 'data'
 		POSx			db		17	; POSx pode ir [1..80]	
 		
 		;#################	
-		POSya			db		8	; POSy anterior
-		POSxa			db		17	; POSx  anterior
-		
+		POSyV			db		8	; POSy tabuleiro final vitoria
+		POSxV			db		17	; POSx tabuleiro final vitoria
+		POSyR			db		8	; POSy referencia de tabuleiro final
+		POSxR			db		17	; POSx referencia de tabuleiro final
 		XPosCorners		BYTE	3, 13, 23
 		YPosCorners		BYTE	1,  6, 11
 
 		LargeBoard		db  	9	 dup( 9 dup(0) )
 		PlayerX			db 		'X'
-		FinalBoard		db  	9	 dup(0) 
+		FinalBoard		db  	9	 dup(0)
 		
 		PlayerO			db 		'O'
 		currentplayer 	db		2
-		
+		_player 		db		0; variavel temporaria
+
 		boardOffsetX	db		1
 		boardoffsetY	db		1
 		;offset to in board corner
@@ -55,9 +57,10 @@ dseg	segment para public 'data'
 		MsgPlayerY 		db 		15
 		MsgPlayerX 		db		3	
 
-		;offset to game  in the corner
+		isOccupied 		db		0
 
-		indexInFullboard db		0
+
+		endofdata 		db 		'Dseg ends Here',0
 
 dseg	ends
 
@@ -264,9 +267,11 @@ SwapPlayer macro
 		Mov ah, dl
 		xor dx, dx
 		mov bx, 2
-		div bx
-		inc dl
+		div bx;resto da divisão por dois
+		inc dl; mais 1
 		mov currentplayer, dl	
+		; 2%2 +1 = 1
+		; 1%2 +1 = 2
 endm
 
 ;########################################################################
@@ -402,6 +407,28 @@ SetBxToCorner macro LargeBoard, boardOffsetX, boardOffsetY
 endm
 
 
+FinalBoardIsPositionOcupied macro FinalBoard, boardOffsetX, boardOffsetY
+	mov isOccupied, 0h
+	xor ax, ax
+	xor bx, bx
+	lea si, FinalBoard
+	mov bx, si
+	mov al, boardOffsetX
+	xor ah, ah
+	add bx, ax
+
+    mov al, boardOffsetY
+	mov ah, 3; diferença entre posições em linha é 2 casas
+	mul ah
+	xor ah, ah
+	add bx, ax	; Bl aponta para posição de canto do tabuleiro
+	xor ax, ax
+	mov al, [bx];iniciado a zero, alterado se o tabuleiro já tiver sido vencido
+	mov isOccupied, al
+endm
+
+
+
 UpdateBoardWithMove PROC
 
 	SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
@@ -423,7 +450,183 @@ UpdateBoardWithMove PROC
     ret
 UpdateBoardWithMove endp
 
+CheckForVictory proc
+	SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
+    ;bx at up-left corner
+    mov cx, 3
+    cicloLinhas:; compara os simbolos das linhas
+		mov ah, [bx]
+		mov al, [bx+1]
+		cmp ah, al
+		jne PrepareNextlineLoop
+		mov al, [bx+2]
+		jne PrepareNextlineLoop
+		call UpdateFinalBoard;vitoria
+		jmp ExitSearch
+	PrepareNextlineLoop:
+		mov al, 3
+		add bl, al;
+	loop cicloLinhas
 
+
+	SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
+    mov cx, 3
+    cicloColunas:; compara os simbolos da coluna
+    mov ah, [bx]
+    mov al, [bx+3]
+    cmp ah, al
+    jne PrepareNextColumnLoop
+	mov al, [bx+6]
+    jne PrepareNextColumnLoop
+    call UpdateFinalBoard;vitoria
+    jmp ExitSearch
+
+PrepareNextColumnLoop:
+        mov al, 1
+        add bl, al;
+	loop cicloColunas
+
+Diagonals:
+	SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
+	mov ax, 4
+	add bx, ax;Centro do tabuleiro
+
+	Downward: ;Canto superior esquerdo para inferior direito
+	mov al, [bx+4]
+	cmp al, bl
+	jne Upwards
+	mov al, [bx-4]
+	cmp al, bl
+	jne Upwards
+	jmp	UpdateFinalBoard
+	
+	Upwards:;Canto inferior esquerdo para superior direito
+	mov al, [bx+2]
+	cmp al, bl
+	jne ExitSearch
+	mov al, [bx-2]
+	cmp al, bl
+	jne IsDraw
+	call	UpdateFinalBoard
+    jmp ExitSearch
+
+IsDraw:
+	SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
+	xor ah, ah
+	mov cx, 9
+	hasContent:
+		mov al, [bx]
+		cmp ah, al
+		je ExitSearch
+	loop hasContent
+	mov _player, 0
+	call PaintBoardColour 
+
+ExitSearch:
+	ret
+
+CheckForVictory endp
+
+
+
+UpdateFinalBoard proc; acabou-se o jogo
+	mov al,  [bx];guarda qual é o jogador que ganho o tabuleiro
+	mov _player, al
+	xor ax, ax
+	xor bx, bx
+	lea si, FinalBoard
+	mov bx, si
+	mov al, boardOffsetY
+	mov ah, 3; diferença entre localização no arrays de tabuleiros em coluna 
+	mul ah
+	xor ah, ah
+	add bx, ax
+	mov al, boardOffsetX
+	add bx, ax
+    mov al, _player
+    mov [bx], al; recebe o jogador vitorioso para o tabuleiro final
+    mov al, POSxR; localização do canto do tabuleiro final
+    mov ah, POSyR
+    add al, boardOffsetX; descolar de acordo com o tabuleiro jogado
+    add ah, boardOffsetY
+	mov POSxV, al; localização para alterar
+    mov POSyV, ah
+    goto_xy POSxV, POSyV
+    mov bl, _player;get player
+		cmp bl, 2
+		jb	WriteO
+    WriteX:
+        mov		dl, 'X'
+        jmp WriteOnFinal
+    WriteO:
+            mov		dl, 'O'
+    WriteOnFinal:
+        mov		dh, Car
+        int		21H	; imprime carater
+	;WIP- mudança de cores
+	call PaintBoardColour 
+
+UpdateFinalBoard endp
+
+
+
+PaintBoardColour proc
+	; 01h azul - vitoria jogador 1
+	; 02h verde - vitoria jogador 2
+	; 0Eh amarelo - empate
+	
+    lea si, YPosCorners; localização de referencia dos canto do tabuleiro grande
+	add si, boardOffsetY
+	inc si
+	mov al,[si]
+	mov POSyV,al
+    
+	lea si, XPosCorners; localização de referencia dos canto do tabuleiro grande
+	add si, boardOffsetX
+	inc si
+	mov al,[si]
+	mov POSxV, al
+	
+	;;poe o cursor onde é para começar a pintar
+	;goto_xy POSxV, POSyV
+
+	mov ax,0b800h
+	mov es,ax
+
+	; posição = Linha*160 + Coluna*2
+	xor ax, ax
+	mov al, POSyV
+	mov bl, 160
+	mul bl 	; Ax = 160 * linha
+	mov bx, ax
+	xor ax, ax
+	mov al, POSxV
+	mov ax, 2
+	mul ah
+	add bx, ax
+	
+	
+	xor ah,ah
+	mov al, _player 
+	cmp ah, al
+	jmp NotDraw
+	mov al, 0Eh;amarelo
+	jmp Print
+NotDraw:
+	mov al, _player
+
+Print:
+	mov cx, 7
+	ciclo: 
+		;mov es:[bx],ah		;altera letra
+		mov es:[bx+1], al	;altera cores da letra
+		mov es:[bx+1+ 160], al	;altera cores da letra
+		mov es:[bx+1+ 160 + 160], al	;altera cores da letra
+		inc bx				;Incrementa o bx duas vezes
+		inc bx				;Porque cada letra são dois bytes
+	loop ciclo
+
+PaintBoardColour endp
 ;########################################################################
 ; Avatar
 
@@ -432,11 +635,11 @@ AVATAR	PROC
 			mov		es,ax
 CICLO:
 		;Pedir input ao jogador
-			xor bx, bx
-			mov		bl, POSx
-			mov		POSxa, bl
-			mov		bh, POSy
-			mov		POSya, bh
+			; xor bx, bx
+			; mov		bl, POSx
+			; ;mov		POSxa, bl
+			; mov		bh, POSy
+			; ;mov		POSya, bh
 		
 			goto_xy	POSx,POSy		; Vai para nova possi��o
 			
@@ -527,10 +730,19 @@ DIREITA:
 
 
 Place_Mark:	;Atualizar tabuleiro com o novo simbolo
+			call CalcBoardOffset
+			call CalcMoveOffset
+
+			;Tabuleiro permitido
+			FinalBoardIsPositionOcupied FinalBoard, boardOffsetX, boardOffsetY
+			xor ah, ah
+			mov al, isOccupied
+			cmp ah, al
+			jne CICLO
+
 			mov bl, currentplayer
 			cmp bl, 2
 			jb	PlayO
-
 PlayX:
 		mov		ah, 02h		; coloca o caracter X
 		mov		dl, 'X'
@@ -548,8 +760,6 @@ PlayO:
 		jmp PostTurn
 			
 PostTurn:
-			call CalcBoardOffset
-			call CalcMoveOffset
 
 			;logica de encontrar vencedor
 
@@ -586,9 +796,10 @@ Main  proc
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;Temporary
 
-		mov		POSx,9
-		mov		POSy,4
-		goto_xy		POSx, POSy
+		; mov		POSx,9
+		; mov		POSy,4
+		; goto_xy		POSx, POSy
+
 
 ;;;;;;;;;Zona de testes
 
