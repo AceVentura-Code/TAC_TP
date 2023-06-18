@@ -335,6 +335,7 @@ CalcMoveOffset PROC
         mov al, boardOffsetX
         mov ah, 10
         mul ah; diferença entre mesmas posições de tabuleiros ajacentes de cada linha 
+        xor ah, ah
         add bl, al
         xor ax, ax
         mov al, POSx
@@ -362,6 +363,7 @@ CalcMoveOffset PROC
         mov al, boardOffsetY
         mov ah, 5
         mul ah; diferença entre mesmas posições de tabuleiros ajacentes de cada coluna
+        xor ah, ah
         add bl, al
         xor ax, ax
         mov al, POSy
@@ -393,7 +395,7 @@ SetBxToCorner macro LargeBoard, boardOffsetX, boardOffsetY
     lea si, LargeBoard
     mov bx, si
     mov al, boardOffsetY
-    mov ah, 27; diferença entre localização no arrya de tabuleiros em coluna 
+    mov ah, 27; diferença entre localização no array de tabuleiros em coluna 
     mul ah
     xor ah, ah
     add bx, ax
@@ -403,7 +405,7 @@ SetBxToCorner macro LargeBoard, boardOffsetX, boardOffsetY
     mul ah
     xor ah, ah
     add bx, ax
-    ; Bl aponta para posição de canto do tabuleiro
+    ; Bl aponta para posição de canto do array de tabuleiros
 endm
 
 
@@ -437,7 +439,7 @@ UpdateBoardWithMove PROC
     mov al, moveOffsetY
     mov ah,3; diferença entre linhas dentro do tabuleiro
     mul ah
-    ;xor Ah,ah; provavelmente redundante (ax = al*ah põe ah a 0)
+    xor Ah,ah; provavelmente redundante (ax = al*ah põe ah a 0)
     add bx, ax
     mov al, moveOffsetX
     add bx, ax
@@ -555,6 +557,7 @@ UpdateFinalBoard proc; acabou-se o jogo
     mov al, boardOffsetX; descolar de acordo com o tabuleiro jogado
     mov ah, 2
     mul ah
+    xor ah, ah
     add al,	POSxR; localização do canto do tabuleiro final
     mov POSxV, al; localização para alterar
 
@@ -622,6 +625,7 @@ PaintBoardColour proc
     mov al, POSxV
     mov ah, 2
     mul ah
+    xor ah, ah
     add bx, ax
     
     xor ah,ah
@@ -822,14 +826,48 @@ Main  proc
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;Temporary
 
-        ; mov		POSx,9
-        ; mov		POSy,4
-        ; goto_xy		POSx, POSy
-
-
 ;;;;;;;;;Zona de testes
+    ;     mov		POSx,9
+    ;     mov		POSy,4
+    ;     goto_xy		POSx, POSy
+    ;     call CalcBoardOffset
+    ;     call CalcMoveOffset
+    ;     call UpdateBoardWithMove
+    ;     SwapPlayer
 
-    ;;;;;;;;;;;;
+        
+    ;     mov		POSx, 15
+    ;     mov		POSy, 4
+    ;     goto_xy		POSx, POSy
+    ;     call CalcBoardOffset
+    ;     call CalcMoveOffset
+    ;     call UpdateBoardWithMove
+    ;     SwapPlayer
+
+        
+    ;     mov		POSx,17
+    ;     mov		POSy,58
+    ;     goto_xy		POSx, POSy
+    ;     call CalcBoardOffset
+    ;     call CalcMoveOffset
+    ;     call UpdateBoardWithMove
+    ;     SwapPlayer
+
+        
+    ;     mov		POSx,7
+    ;     mov		POSy,3
+    ;     goto_xy		POSx, POSy
+    ;     call CalcBoardOffset
+    ;     call CalcMoveOffset
+    ;     call UpdateBoardWithMove
+
+
+    ;     mov		ah, 02h		; coloca o caracter X
+    ;     mov		dl, 'X'
+    ;     mov		dh, Car
+    ;     int		21H	
+    ;     call PaintBoardColour
+    ; ;;;;;;;;;;;;
 
 
     ; call UpdateBoardWithMove
