@@ -57,7 +57,8 @@ dseg	segment para public 'data'
         MsgPlayerY 		db 		15
         MsgPlayerX 		db		3	
 
-        isOccupied 		db		0
+        isOccupied      db      0
+        CloseGame 		db		0
 
         endInDraw       db      'Empate$',0
         endofGame 		db 		'Vitoria de $',0
@@ -263,21 +264,211 @@ LE_TECLA	endp
 ;########################################################################
 ; Player switch
 SwapPlayer macro
-        Mov al, currentplayer
-        Mov ah, dl
-        xor dx, dx
-        mov bx, 2
-        div bx;resto da divisão por dois
-        inc dl; mais 1
-        mov currentplayer, dl	
-        ; 2%2 +1 = 1
-        ; 1%2 +1 = 2
+    Mov al, currentplayer
+    Mov ah, dl
+    xor dx, dx
+    mov bx, 2
+    div bx;resto da divisão por dois
+    inc dl; mais 1
+    mov currentplayer, dl	
+    ; 2%2 +1 = 1
+    ; 1%2 +1 = 2
 endm
 
 ;########################################################################
 ; Calculate offset to left-up-most board
 ;		0 for aligned, 1 for middle, 2 for oposite
 ;		for both x (left) and y (up)
+
+PaintFinalBoard proc
+    
+    mov ax,0b800h
+    mov es,ax
+
+    ; posição = Linha*160 + Coluna*2
+    xor ax, ax
+    mov al, POSyR
+    mov bl, 160
+    mul bl      ; Ax = 160 * linha
+    mov bx, ax
+    xor ax, ax
+    mov al, POSxR
+    dec al; avoid black bar on left
+    mov ah, 2
+    mul ah
+    xor ah, ah
+    add bx, ax
+    
+    xor ah,ah
+    mov al, _player 
+    cmp ah, al
+    jne NotDrawFinal
+    mov al, 6Fh;amarelo
+    jmp PrintFinal
+NotDrawFinal:
+    WinX:
+    cmp al, 1
+    jne WinO
+    mov al, 1Fh
+    jmp PrintFinal
+    winO:
+    mov al, 2Fh
+
+PrintFinal:
+    mov cx, 7
+    cicloFinal: 
+        ;mov es:[bx],ah				;altera letra
+        mov es:[bx+1], al		;altera cores da letra
+        mov es:[bx+1+ 160], al		
+        mov es:[bx+1+ 160 + 160], al	
+        inc bx						;Incrementa o bx duas vezes
+        inc bx						;Porque cada letra são dois bytes
+    loop cicloFinal
+
+PaintFinalBoard endp
+
+
+DeclareWinner proc
+    goto_xy  3, 18
+    mov bl, _player
+    mov bh, 0
+    cmp bh, bl
+    je NoWinner
+    mov bh, 1
+    cmp bh, bl
+    je getXName
+
+    getOName:
+        lea     si, StrPlayer2
+        jmp PrintName
+    getXName:
+        lea     si, StrPlayer1
+    
+PrintName:
+
+    mov     ah,09h
+    lea     dx,endofGame
+    int     21h
+
+    goto_xy  14, 18
+    mov     ah,09h
+    mov dx, si
+    int     21h
+    jmp paintFinal
+
+NoWinner:
+
+    mov     ah,09h
+    lea     dx,endInDraw
+    int     21h
+
+paintFinal:
+    mov CloseGame, 1
+    call PaintFinalBoard
+DeclareWinner endp
+
+GetFinalBoardToBx macro
+    xor ax, ax
+    xor bx, bx
+    lea si, FinalBoard
+    mov bx, si
+endm
+
+DeclareVictory proc
+    GetFinalBoardToBx
+    ;bx at up-left corner
+    mov cx, 3
+    cicloLinhasFinal:; compara os simbolos das linhas
+        mov al, 0; nao presisa comnparar espacos 
+        mov ah, [bx]
+        cmp ah, al
+        je PrepareNextlineLoopFinal
+        
+        mov al, [bx+1]
+        cmp ah, al      ;ver se é igual ao canto
+        jne PrepareNextlineLoopFinal
+        
+        mov al, [bx+2]
+        cmp ah, al
+        jne PrepareNextlineLoopFinal
+        
+        call DeclareWinner;vitoria
+        jmp ExitSearchFinal
+
+    PrepareNextlineLoopFinal:
+        mov ax, 0003
+        add bx, ax
+    loop cicloLinhasFinal
+
+
+    GetFinalBoardToBx
+    mov cx, 3
+    cicloColunasFinal:; compara os simbolos da coluna
+        mov al, 0; nao precisa comnparar espacos 
+        mov ah, [bx]
+        cmp ah, al
+        je PrepareNextColumnLoopFinal
+        
+        mov al, [bx+3]
+        cmp ah, al
+        jne PrepareNextColumnLoopFinal
+        
+        mov al, [bx+6]
+        cmp ah, al
+        jne PrepareNextColumnLoopFinal
+        
+        call DeclareWinner;vitoria
+        jmp ExitSearchFinal
+
+    PrepareNextColumnLoopFinal:
+        mov ax, 0001
+        add bx, ax;
+    loop cicloColunasFinal
+
+DiagonalsFinal:
+    GetFinalBoardToBx
+    mov ax, 4
+    add bx, ax;Centro do tabuleiro
+    mov ah, [bx]
+
+    mov al, 0; nao precisa comparar espacos vazios
+    cmp ah, al
+    je ExitSearchFinal
+    DownwardFinal: ;Canto superior esquerdo para inferior direito
+    mov al, [bx+4]
+    cmp al, ah
+    jne UpwardsFinal
+    mov al, [bx-4]
+    cmp al, ah
+    jne UpwardsFinal
+    call UpdateFinalBoard
+    
+    UpwardsFinal:;Canto inferior esquerdo para superior direito
+    mov al, [bx+2]
+    cmp al, ah
+    jne ExitSearchFinal
+    mov al, [bx-2]
+    cmp al, ah
+    jne IsDrawFinal
+    call	DeclareWinner
+    jmp ExitSearchFinal
+
+IsDrawFinal:
+    GetFinalBoardToBx
+    mov ah, 0
+    mov cx, 9
+    hasContentFinal:
+        mov al, [bx]
+        cmp ah, al
+        je ExitSearchFinal
+    loop hasContentFinal
+    mov _player, 0
+    call PaintFinalBoard
+
+ExitSearchFinal:
+    ret
+
+DeclareVictory endp
 
 CalcBoardOffset PROC
         Mov bl, byte ptr [XPosCorners + 2]
@@ -676,193 +867,8 @@ Print:
 PaintBoardColour endp
 
 
-DeclareWinner proc
-    goto_xy  3, 18
-    mov bl, _player
-    mov bh, 0
-    cmp bh, bl
-    je NoWinner
-    mov bh, 1
-    cmp bh, bl
-    je getXName
-
-    getOName:
-        lea     si, StrPlayer2
-        jmp PrintName
-    getXName:
-        lea     si, StrPlayer1
-    
-PrintName:
-
-    mov     ah,09h
-    lea     dx,endofGame
-    int     21h
-
-    goto_xy  14, 18
-    mov     ah,09h
-    mov dx, si
-    int     21h
-    jmp paintFinal
-
-NoWinner:
-
-    mov     ah,09h
-    lea     dx,endInDraw
-    int     21h
-
-paintFinal:
-    call PaintFinalBoard
-DeclareWinner endp
-
-GetFinalBoardToBx macro
-    xor ax, ax
-    xor bx, bx
-    lea si, FinalBoard
-    mov bx, si
-endm
-
-DeclareVictory proc
-    GetFinalBoardToBx
-    ;bx at up-left corner
-    mov cx, 3
-    cicloLinhasFinal:; compara os simbolos das linhas
-        mov al, 0; nao presisa comnparar espacos 
-        mov ah, [bx]
-        cmp ah, al
-        je PrepareNextlineLoopFinal
-        
-        mov al, [bx+1]
-        cmp ah, al      ;ver se é igual ao canto
-        jne PrepareNextlineLoopFinal
-        
-        mov al, [bx+2]
-        cmp ah, al
-        jne PrepareNextlineLoopFinal
-        
-        call DeclareWinner;vitoria
-        jmp ExitSearchFinal
-
-    PrepareNextlineLoopFinal:
-        mov ax, 0003
-        add bx, ax
-    loop cicloLinhasFinal
 
 
-    GetFinalBoardToBx
-    mov cx, 3
-    cicloColunasFinal:; compara os simbolos da coluna
-        mov al, 0; nao precisa comnparar espacos 
-        mov ah, [bx]
-        cmp ah, al
-        je PrepareNextColumnLoopFinal
-        
-        mov al, [bx+3]
-        cmp ah, al
-        jne PrepareNextColumnLoopFinal
-        
-        mov al, [bx+6]
-        cmp ah, al
-        jne PrepareNextColumnLoopFinal
-        
-        call DeclareWinner;vitoria
-        jmp ExitSearchFinal
-
-    PrepareNextColumnLoopFinal:
-        mov ax, 0001
-        add bx, ax;
-    loop cicloColunasFinal
-
-DiagonalsFinal:
-    GetFinalBoardToBx
-    mov ax, 4
-    add bx, ax;Centro do tabuleiro
-    mov ah, [bx]
-
-    mov al, 0; nao precisa comparar espacos vazios
-    cmp ah, al
-    je ExitSearchFinal
-    DownwardFinal: ;Canto superior esquerdo para inferior direito
-    mov al, [bx+4]
-    cmp al, ah
-    jne UpwardsFinal
-    mov al, [bx-4]
-    cmp al, ah
-    jne UpwardsFinal
-    call UpdateFinalBoard
-    
-    UpwardsFinal:;Canto inferior esquerdo para superior direito
-    mov al, [bx+2]
-    cmp al, ah
-    jne ExitSearchFinal
-    mov al, [bx-2]
-    cmp al, ah
-    jne IsDrawFinal
-    call	DeclareWinner
-    jmp ExitSearchFinal
-
-IsDrawFinal:
-    GetFinalBoardToBx
-    mov ah, 0
-    mov cx, 9
-    hasContentFinal:
-        mov al, [bx]
-        cmp ah, al
-        je ExitSearchFinal
-    loop hasContentFinal
-    mov _player, 0
-    call PaintFinalBoard
-
-ExitSearchFinal:
-    ret
-
-DeclareVictory endp
-
-PaintFinalBoard proc
-    
-    mov ax,0b800h
-    mov es,ax
-
-    ; posição = Linha*160 + Coluna*2
-    xor ax, ax
-    mov al, POSyR
-    mov bl, 160
-    mul bl      ; Ax = 160 * linha
-    mov bx, ax
-    xor ax, ax
-    mov al, POSxR
-    dec al; avoid black bar on left
-    mov ah, 2
-    mul ah
-    xor ah, ah
-    add bx, ax
-    
-    xor ah,ah
-    mov al, _player 
-    cmp ah, al
-    jne NotDrawFinal
-    mov al, 6Fh;amarelo
-    jmp PrintFinal
-NotDrawFinal:
-    WinX:
-    cmp al, 1
-    jne WinO
-    mov al, 1Fh
-    jmp PrintFinal
-    winO:
-    mov al, 2Fh
-
-PrintFinal:
-    mov cx, 7
-    cicloFinal: 
-        ;mov es:[bx],ah				;altera letra
-        mov es:[bx+1], al		;altera cores da letra
-        mov es:[bx+1+ 160], al		
-        mov es:[bx+1+ 160 + 160], al	
-        inc bx						;Incrementa o bx duas vezes
-        inc bx						;Porque cada letra são dois bytes
-    loop cicloFinal
-
-PaintFinalBoard endp
 
 ;########################################################################
 ; Avatar
@@ -1000,7 +1006,10 @@ PostTurn:
         ;logica de encontrar vencedor
         SwapPlayer
         call CheckForVictory
-    ; call DeclareVictory
+        call DeclareVictory
+        mov al, CloseGame
+        mov ah, 1
+        je fim
         ;set up next turn
         ; SwapPlayer
         jmp		CICLO
@@ -1036,214 +1045,8 @@ Main  proc
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;Temporary
 
 ;;;;;;;;;Zona de testes
-; mov al, 0
-; mov _player, al
-; call DeclareWinner
 
-    ;     mov		POSx,9
-    ;     mov		POSy,4
-    ;     goto_xy		POSx, POSy
-    ;     call CalcBoardOffset
-    ;     call CalcMoveOffset
-
-    ; mov _player, 10h
-    ; xor ax, ax
-    ; xor bx, bx
-
-    ; ; por bx no ponteriro desejado e altera o array do tabuleiro para por o jogador nessa posição
-    ; lea si, FinalBoard;pega no inicio do tabuleiro final
-    ; mov bx, si
-    ; mov al, boardOffsetY
-    ; mov ah, 3; diferença entre localização no arrays de tabuleiros em coluna 
-    ; mul ah; multiplica offset * 3 (para ir para baixo nas colunas)
-    ; xor ah, ah
-    ; add bx, ax
-    ; mov al, boardOffsetX;adicionado diretamente
-    ; add bx, ax; Ah zerado e ainda não voutou as ser alterado
-
-    ; mov al, _player
-    ; mov [bx], al; recebe o jogador vitorioso para o tabuleiro final
-    
-
-
-;  SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
-;     ;bx at up-left corner
-;     mov cx, 3
-;     cicloLinhas:; compara os simbolos das linhas
-;         mov al, 0; nao presisa comnparar espacos 
-;         mov ah, [bx]
-;         cmp ah, al
-;         je PrepareNextlineLoop
-;         mov al, [bx+1]
-;         cmp ah, al
-;         jne PrepareNextlineLoop
-;         mov al, [bx+2]
-;         jne PrepareNextlineLoop
-;         call UpdateFinalBoard;vitoria
-;         jmp ExitSearch
-;     PrepareNextlineLoop:
-;         mov ax, 0003
-;         add bx, ax
-;     loop cicloLinhas
-
-
-;     SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
-;     mov cx, 3
-;     cicloColunas:; compara os simbolos da coluna
-;         mov al, 0; nao precisa comnparar espacos 
-;         mov ah, [bx]
-;         cmp ah, al
-;         je PrepareNextColumnLoop
-;         mov al, [bx+3]
-;         cmp ah, al
-;         jne PrepareNextColumnLoop
-;         mov al, [bx+6]
-;         jne PrepareNextColumnLoop
-;         call UpdateFinalBoard;vitoria
-;         jmp ExitSearch
-;     PrepareNextColumnLoop:
-;         mov ax, 0001
-;         add bx, ax;
-;     loop cicloColunas
-
-; Diagonals:
-;     SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
-;     mov ax, 4
-;     add bx, ax;Centro do tabuleiro
-
-;     Downward: ;Canto superior esquerdo para inferior direito
-;     mov al, [bx+4]
-;     cmp al, bl
-;     jne Upwards
-;     mov al, [bx-4]
-;     cmp al, bl
-;     jne Upwards
-;     jmp	UpdateFinalBoard
-    
-;     Upwards:;Canto inferior esquerdo para superior direito
-;     mov al, [bx+2]
-;     cmp al, bl
-;     jne ExitSearch
-;     mov al, [bx-2]
-;     cmp al, bl
-;     jne IsDraw
-;     call	UpdateFinalBoard
-;     jmp ExitSearch
-
-; IsDraw:
-;     SetBxToCorner LargeBoard, boardOffsetX, boardOffsetY
-;     mov ah, 0
-;     mov cx, 9
-;     hasContent:
-;         mov al, [bx]
-;         cmp ah, al
-;         je ExitSearch
-;     loop hasContent
-;     mov _player, 0
-;     call PaintBoardColour 
-
-; ExitSearch:
-
-
-;         call UpdateBoardWithMove
-;         SwapPlayer
-
-        
-;         mov		POSx, 15
-;         mov		POSy, 4
-;         goto_xy		POSx, POSy
-;         call CalcBoardOffset
-;         call CalcMoveOffset
-;         call UpdateBoardWithMove
-;         SwapPlayer
-
-        
-;         mov		POSx,17
-;         mov		POSy,58
-;         goto_xy		POSx, POSy
-;         call CalcBoardOffset
-;         call CalcMoveOffset
-;         call UpdateBoardWithMove
-;         SwapPlayer
-
-        
-;         mov		POSx,7
-;         mov		POSy,3
-;         goto_xy		POSx, POSy
-;         call CalcBoardOffset
-;         call CalcMoveOffset
-
-    
-;     ; apontar coodenadas POS_V para o canto onde começar a pintar
-;     xor ax, ax
-;     mov al, boardOffsetY
-;     lea si, YPosCorners; localização de referencia dos canto do tabuleiro grande
-;     mov bx , si
-;     add bx, ax
-;     ; inc bx
-;     mov ah,[bx]
-;     inc ah
-;     mov POSyV,ah
-    
-;     xor ax, ax
-;     mov al, boardOffsetX
-;     lea si, XPosCorners; localização de referencia dos canto do tabuleiro grande
-;     mov bx, si
-;     add bx, ax
-;     ; inc bx
-;     mov ah, [bx]
-;     inc ah
-;     mov POSxV, ah
-    
-;     ;;poe o cursor onde é para começar a pintar
-;     ;goto_xy POSxV, POSyV
-
-;     mov ax,0b800h
-;     mov es,ax
-
-;     ; posição = Linha*160 + Coluna*2
-;     xor ax, ax
-;     mov al, POSyV
-;     mov bl, 160
-;     mul bl      ; Ax = 160 * linha
-;     mov bx, ax
-;     xor ax, ax
-;     mov al, POSxV
-;     mov ah, 2
-;     mul ah
-;     xor ah, ah
-;     add bx, ax
-    
-;     xor ah,ah
-;     mov al, _player 
-;     cmp ah, al
-;     jne NotDraw
-;     mov al, 6Fh;amarelo
-;     jmp Print
-; NotDraw:
-;     WinX:
-;     cmp al, 1
-;     jne WinO
-;     mov al, 1Fh
-;     jmp Print
-;     winO:
-;     mov al, 2Fh
-
-; Print:
-;     mov cx, 7
-;     ciclo: 
-;         ;mov es:[bx],ah				;altera letra
-;         mov es:[bx+1], al		;altera cores da letra
-;         mov es:[bx+1+ 160], al		
-;         mov es:[bx+1+ 160 + 160], al	
-;         inc bx						;Incrementa o bx duas vezes
-;         inc bx						;Porque cada letra são dois bytes
-;     loop ciclo
-
-;     ;     call UpdateBoardWithMove
-
-
-;     ; ;;;;;;;;;;;;
+; ; ;;;;;;;;;;;;
 
 
     ; call UpdateBoardWithMove
