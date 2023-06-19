@@ -34,16 +34,17 @@ dseg	segment para public 'data'
         YPosCorners		BYTE	1,  6, 11
 
         LargeBoard		db  	9	 dup( 9 dup(0) )
-        PlayerX			db 		'X'
+        PlayerX			db 		'X $', 0
         FinalBoard		db  	9	 dup(0)
         
-        PlayerO			db 		'O'
+        PlayerO			db 		'O $', 0
         currentplayer 	db		2
         _player 		db		0; variavel temporaria
 
+        ;offset do tabuleiro de canto
         boardOffsetX	db		1
         boardoffsetY	db		1
-        ;offset to in board corner
+        ;offset do canto do tabuleiro
         moveOffsetX	db		1
         moveoffsetY	db		1
 
@@ -54,11 +55,10 @@ dseg	segment para public 'data'
         StrPlayer2	 	DB 		"diogo       $",0			
         strLength		db		12
     
-        MsgPlayerY 		db 		15
-        MsgPlayerX 		db		3	
+        ; MsgPlayerY 		db 		15
+        ; MsgPlayerX 		db		3	
 
         isOccupied      db      0
-        CloseGame 		db		0
 
         endInDraw       db      'Empate$',0
         endofGame 		db 		'Vitoria de $',0
@@ -168,99 +168,43 @@ SAI_TECLA:	RET
 LE_TECLA	endp
 
 
-;LE_STRING 	proc
-    ;mov ah, 0Ah
-    ;mov dx, offset BufferEntrada
-    ;int 21h
-    ;mov si, offset BufferEntrada + 2 ; A string começa no terceiro byte do buffer
-    ;mov di, offset StrInput
-    ;mov cl, byte ptr [BufferEntrada + 1] ; Comprimento da string
-    ;mov ch, 0 ; Zerar o contador
-    ;rep movsb ; Mover a string do buffer de entrada para StrInput
-    ;ret
-;LE_STRING 	endp
-
 ; ; ;########################################################################
-; ; ; SET_PLAYERS
-; ; SET_PLAYERS proc
 
-; ; 		goto_xy 10, 10
-; ; 		lea     dx,ExeName
-; ; 		mov     ah,09h
-; ; 		int     21h; AH already set to 09h
+LerNomes proc
 
-; ; 		;escreve mensagem
-; ; 		goto_xy	MsgPlayerX, MsgPlayerY
-; ; 		mov     ah,09h
-; ;         lea     dx,Nome_Msg
-; ;         int     21h; AH already set to 09h
-        
-; ; 		inc MsgPlayerY
-; ; 		goto_xy	MsgPlayerX, 17
-; ; 		mov     ah,09h
-; ; 		lea		dx,strPlayer
-; ; 		int     21h
-        
-; ; 		Mov cx, 12 	
-        
-; ; 		MOV bx, 0
-        
-        
-; ; 		;cmp 
-        
+    goto_xy  14, 21
+    mov     ah,09h
+    lea dx, Nome_Ms
+    int     21h
+    goto_xy  14, 22
+    mov     ah,09h
+    lea dx, strPlayer
+    int     21h
+    goto_xy  24, 22
+    mov     ah,09h
+    lea dx, PlayerX
+    int     21h
 
-; ; LER_NOME:	;leitura input nome
-; ; 		mov ah,07h
-; ; 		int  21h
-        
-; ; 		cmp al,13;is an \r\n
-; ; 		je Nome_lido;exit on enter
-        
-; ; 		; verifica se é uma letra
-; ; 		cmp al,'A'
-; ; 		jb LER_NOME
+    mov ah, 0Ah
+    lea dx, strplayer1
+    int 21h       ; Lê a primeira string do usuário
 
-; ; 		cmp al,'z'
-; ; 		ja LER_NOME
-        
-        
-; ; 		INC dl
-        
-; ; 		loop LER_NOME
-        
-; ; Nome_lido:		
+    goto_xy  14, 23
+    mov     ah,09h
+    lea dx, strPlayer
+    int     21h
+    goto_xy  24, 23
+    mov     ah,09h
+    lea dx, PlayerO
+    int     21h
 
-; ; 	goto_xy	MsgPlayerX, MsgPlayerY
-; ; 	lea     dx, Nome_Msg
-; ; 	int     21h; AH already set to 09h
-; ; 	ret	
+    mov ah, 0Ah
+    lea dx, strplayer2
+    int 21h       ; Lê a segunda string do usuário
+
+LerNomes endp
         
 
-; ; SET_PLAYERS endp
-
-; ; Nome_Leitura proc;leitura input nome
-
-; ; ler_Chan_nome:
-; ; 		mov ah,07h
-; ; 		int  21h
-        
-; ; 		cmp al,13;is an \r\n
-; ; 		je fim_nome
-        
-; ; 		mov		ah, 02h		; coloca o caracter lido no ecra
-; ; 		mov		dl, al
-; ; 		int		21H	
-        
-; ; 		loop ler_Chan_nome
-        
-        
-        
-; ; fim_nome:
-; ; 	ret
-        
-; ; Nome_Leitura endp
-        
-        
 ;########################################################################
 ; Player switch
 SwapPlayer macro
@@ -288,7 +232,7 @@ PaintFinalBoard proc
     ; posição = Linha*160 + Coluna*2
     xor ax, ax
     mov al, POSyR
-    mov bl, 160
+    mov bl, 160 ;80 caraters de largura com 2 bytes cada
     mul bl      ; Ax = 160 * linha
     mov bx, ax
     xor ax, ax
@@ -363,7 +307,6 @@ NoWinner:
     int     21h
 
 paintFinal:
-    mov CloseGame, 1
     call PaintFinalBoard
 DeclareWinner endp
 
@@ -422,7 +365,7 @@ DeclareVictory proc
 
     PrepareNextColumnLoopFinal:
         mov ax, 0001
-        add bx, ax;
+        add bx, ax
     loop cicloColunasFinal
 
 DiagonalsFinal:
@@ -1007,9 +950,6 @@ PostTurn:
         SwapPlayer
         call CheckForVictory
         call DeclareVictory
-        mov al, CloseGame
-        mov ah, 1
-        je fim
         ;set up next turn
         ; SwapPlayer
         jmp		CICLO
@@ -1040,27 +980,24 @@ Main  proc
         mov			ax,0B800h
         mov			es,ax
         
+        
         call		apaga_ecran	
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;Temporary
 
 ;;;;;;;;;Zona de testes
 
-; ; ;;;;;;;;;;;;
-
-
-    ; call UpdateBoardWithMove
+;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;Temporary
-
-
-        ;call 		SET_PLAYERS		
-        ;call		apaga_ecran			
         
+        ; call 		LerNomes		
+        ; call		apaga_ecran			
         
         goto_xy		0,0
         call		IMP_FICH
-        
+
+
         goto_xy		POSx, POSy
         call 		AVATAR
         goto_xy		0,22
